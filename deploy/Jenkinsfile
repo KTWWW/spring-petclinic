@@ -9,13 +9,13 @@ pipeline {
     stages {
         stage('Git Clone') {
             steps {
-            echo 'Git Clone'
-            git url: 'https://github.com/KTWWW/spring-petclinic.git',
-            branch: 'main', credentialsId: 'gitCredentials'
+                echo 'Git Clone'
+                git url: 'https://github.com/s4616/spring-petclinic.git',
+                branch: 'main', credentialsId: 'gitCredentials'
             }
             post {
                 success {
-                    echo 'Git Clone success'
+                    echo 'Git Clone Success'
                 }
                 failure {
                     echo 'Git Clone Fail'
@@ -24,23 +24,29 @@ pipeline {
         }
         stage('Build') {
             steps {
-            echo 'Build'
+                echo 'Build'
+                sh 'mvn -Dmaven.test.failure.ignore=true clean package'
+            }
+            post {
+                success {
+                    junit 'target/surefire-reports/**/*.xml'
+                }
             }
         }
         stage('Docker Image') {
             steps {
-            echo 'Docker Image'
-            }
+                echo 'Docker Image'
+            }            
         }
         stage('Docker Push') {
             steps {
-            echo 'Docker Push'
-            }
+                echo 'Docker Push'
+            }            
         }
         stage('Target Pull') {
             steps {
-            echo 'Target Pull'
-            }
+                echo 'Target Pull'
+            }            
         }
     }
 }
