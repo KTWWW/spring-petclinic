@@ -19,7 +19,7 @@ pipeline {
         stage('Git init') {
             steps {
                 echo 'Git Init'
-                git url:'https://github.com/s4616/spring-petclinic.git/',
+                git url:'https://github.com/ktwww/spring-petclinic.git/',
                 branch: 'main', credentialsId: 'gitCredentials'
             }
         }
