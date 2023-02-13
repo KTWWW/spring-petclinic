@@ -5,12 +5,13 @@ pipeline {
         maven 'M3'
         jdk 'JDK11'
     }
-    
     environment {
         AWS_CREDENTIAL_NAME = "awsEcrCredentials"
-        REGIAN = "ap-northeast-2"
-        ECR_REPOSITORY = "257307634175.dkr.ecr.ap-northeast-2.amazonaws.com"
-        ECR_DOCKER_IMAGE = "${ECR_REPOSITORY}/std10-spring-petclinic"
+        AWS_ACCOUNT_ID = "257307634175"
+        REGION = "ap-northeast-2"
+        DOCKER_IMAGE_NAME = "std10-spring-petclinic"        
+        ECR_REPOSITORY = "${AWS_ACCOUNT_ID}.dkr.ecr.ap-northeast-2.amazonaws.com"
+        ECR_DOCKER_IMAGE = "${ECR_REPOSITORY}/${DOCKER_IMAGE_NAME}"
         ECR_DOCKER_TAG = "1.0"
     }
     
@@ -18,7 +19,7 @@ pipeline {
         stage('Git init') {
             steps {
                 echo 'Git Init'
-                git url:' https://github.com/KTWWW/spring-petclinic.git/',
+                git url:'https://github.com/s4616/spring-petclinic.git/',
                 branch: 'main', credentialsId: 'gitCredentials'
             }
         }
@@ -26,34 +27,32 @@ pipeline {
             steps {
                 echo 'Build'
                 sh 'mvn -Dmaven.test.failure.ignore=true clean package'
-                
             }
         }
-        stage('Docker Image Build') {
+        stage ('Docker Image Build') {
             steps {
                 echo 'Docker Image Build'
                 dir("${env.WORKSPACE}") {
-                    sh 'docker build -t std10-spring-petclinic:1.0 .'
+                    sh 'docker build -t ${ECR_DOCKER_IMAGE}:${ECR_DOCKER_TAG} .'
                 }
             }
         }
-        stage('Docker Image Push') {
+        stage ('Docker Image Push') {
             steps {
                 echo 'Docker Image Push'
-                script {
+                script{
                     // cleanup current user docker credentials
-                    sh 'rm -f ~/.dockercfg ~/.docker/config.json || true'
-                    
-                    sh 'aws ecr get-login-password --region ap-northeast-2 | docker login --username AWS --password-stdin 257307634175.dkr.ecr.ap-northeast-2.amazonaws.com'
-                    sh 'docker tag std10-spring-petclinic:1.0 257307634175.dkr.ecr.ap-northeast-2.amazonaws.com/std10-spring-petclinic:1.0'
-                    sh 'docker push 257307634175.dkr.ecr.ap-northeast-2.amazonaws.com/std10-spring-petclinic:1.0'
-                    
+                    sh 'rm -f ~/.dockercfg ~/.docker/config.json || true'                    
+                   
+                    docker.withRegistry("https://${ECR_REPOSITORY}", "ecr:${REGION}:${AWS_CREDENTIAL_NAME}") {
+                      docker.image("${ECR_DOCKER_IMAGE}:${ECR_DOCKER_TAG}").push()
+                    }
                 }
             }
-        }
+        }        
         stage('Code Deploy') {
             steps {
-                echo 'Code Deploy'
+                echo 'Code Deploy'  
             }
         }
     }
