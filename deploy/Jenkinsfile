@@ -1,45 +1,63 @@
 pipeline {
     agent any
-    
     tools {
         maven 'M3'
         jdk 'JDK11'
-    }
+    }   
+
     environment {
-        AWS_CREDENTIAL_NAME = "awsEcrCredentials"
+        AWS_CREDENTIAL_NAME = "awsEcrCredential"
         AWS_ACCOUNT_ID = "257307634175"
         REGION = "ap-northeast-2"
-        DOCKER_IMAGE_NAME = "std10-spring-petclinic"        
+        DOCKER_IMAGE_NAME="project02-spring-petclinic"
+        DOCKER_TAG="1.0"
         ECR_REPOSITORY = "${AWS_ACCOUNT_ID}.dkr.ecr.ap-northeast-2.amazonaws.com"
         ECR_DOCKER_IMAGE = "${ECR_REPOSITORY}/${DOCKER_IMAGE_NAME}"
-        ECR_DOCKER_TAG = "1.0"
-    }
-    
+        ECR_DOCKER_TAG = "${DOCKER_TAG}"
+
     stages {
-        stage('Git init') {
+        stage('Git clone') {
             steps {
-                echo 'Git Init'
-                git url:'https://github.com/ktwww/spring-petclinic.git/',
-                branch: 'main', credentialsId: 'gitCredentials'
+                git url: 'https://github.com/ktwww/spring-petclinic.git', branch: 'main', credentialsId: 'ktwww'
+            }
+            post {
+                success {
+                    echo 'success clone project'
+                }
+                failure {
+                    error 'fail clone project' // exit pipeline
+                }
             }
         }
-        stage('Build') {
+        
+        stage ('mvn Build') {
             steps {
-                echo 'Build'
-                sh 'mvn -Dmaven.test.failure.ignore=true clean package'
+                sh 'mvn -Dmaven.test.failure.ignore=true install' 
+            }
+            post {
+                success {
+                    junit 'target/surefire-reports/**/*.xml' 
+                }
             }
         }
-        stage ('Docker Image Build') {
+        
+        stage ('Docker Build') {
             steps {
-                echo 'Docker Image Build'
                 dir("${env.WORKSPACE}") {
                     sh 'docker build -t ${ECR_DOCKER_IMAGE}:${ECR_DOCKER_TAG} .'
                 }
             }
-        }
-        stage ('Docker Image Push') {
+            
+            post {
+                success {
+                    echo "Docker build success!"
+                }
+            }
+        }       
+
+        stage('Push Docker Image') {
             steps {
-                echo 'Docker Image Push'
+                echo "Push Docker Image to ECR"
                 script{
                     // cleanup current user docker credentials
                     sh 'rm -f ~/.dockercfg ~/.docker/config.json || true'                    
@@ -49,11 +67,46 @@ pipeline {
                     }
                 }
             }
-        }        
-        stage('Code Deploy') {
-            steps {
-                echo 'Code Deploy'  
+            post {
+                success {
+                    echo "Push Docker Image success!"
+                }
             }
         }
+        stage('Upload to S3') {
+            steps {
+                echo "Upload to S3"
+                dir("${env.WORKSPACE}") {
+                    sh 'zip -r deploy-1.0.zip ./deploy appspec.yml'
+                    sh 'aws s3 cp --region ap-northeast-2 --acl private ./deploy-1.0.zip s3://project02-codedeploy'
+                    sh 'rm -rf ./deploy-1.0.zip'
+                }
+            }
+        }
+        
+        stage('Codedeploy Workload') {
+            steps {
+                echo "create application"
+                sh 'aws deploy create-application --application-name project02'
+               
+                echo "create Codedeploy group"   
+                sh '''
+                    aws deploy create-deployment-group \
+                    --application-name project02 \
+                    --auto-scaling-groups project02-auto-scaling \
+                    --deployment-group-name project02-code-deploy \
+                    --deployment-config-name CodeDeployDefault.OneAtATime \
+                    --service-role-arn arn:aws:iam::257307634175:role/project02-code-deploy-service-role
+                    '''
+                echo "Codedeploy Workload"   
+                sh '''
+                    aws deploy create-deployment --application-name project02 \
+                    --deployment-config-name CodeDeployDefault.OneAtATime \
+                    --deployment-group-name project02-code-deploy \
+                    --s3-location bucket=project02-codeproject,bundleType=zip,key=deploy-1.0.zip
+                    '''
+                    sleep(10) // sleep 10s
+            }
+        }        
     }
 }
