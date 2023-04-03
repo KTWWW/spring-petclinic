@@ -87,6 +87,11 @@ pipeline {
         
         stage('Codedeploy Workload') {
             steps {
+                # 기존에 만든 디플로이가 있어서 충돌날때 기존에 디플로이 지우고
+                echo "delete deployment"
+                sh 'aws deploy delete-application --application-name project02'
+                
+                # 새로 만듬
                 echo "create application"
                 sh 'aws deploy create-application --application-name project02'
                
@@ -97,7 +102,7 @@ pipeline {
                     --auto-scaling-groups project02-auto-scaling \
                     --deployment-group-name project02-code-deploy \
                     --deployment-config-name CodeDeployDefault.OneAtATime \
-                    --service-role-arn arn:aws:iam::257307634175:role/project02-code-deploy-service-role
+                    --service-role-arn arn:aws:iam::257307634175:role/project02-codedeploy-service-role
                     '''
                 echo "Codedeploy Workload"   
                 sh '''
