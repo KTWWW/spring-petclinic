@@ -3,9 +3,8 @@ version: 0.0
 os:  linux
 
 files:
-  - source: /
+  - source: deploy/
     destination: /home/ubuntu
-    overwrite: yes
 
 permission:
   - object: /home/ubuntu
