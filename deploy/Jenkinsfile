@@ -19,7 +19,7 @@ pipeline {
     stages {
         stage('Git clone') {
             steps {
-                git url: 'https://github.com/ktwww/spring-petclinic.git', branch: 'main', credentialsId: 'ktwww'
+                git url: 'https://github.com/KTWWW/spring-petclinic.git', branch: 'main', credentialsId: 'KTWWW'
             }
             post {
                 success {
